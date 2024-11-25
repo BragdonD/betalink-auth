@@ -391,7 +391,67 @@ paths:
               example: 
                 error: "Internal Server Error"
                 message: "An error occurred while processing your request. Please try again later."
- 
+  /token/refresh:
+    get:
+      summary: Refresh Access Token and Rollout the Refresh Token
+      parameters:
+        - in: cookie
+          name: refreshToken
+          required: true
+          schema:
+            type: string
+            description: The refresh token issued during login.
+      responses:
+        "200":
+          description: A new access token and refresh token have been issued.
+          headers:
+            Authentication: 
+              schema:
+                type: string
+              description: The access token representing the user's identity.
+            Set-Cookie:
+              description: Sets the refresh token in an HTTP-only cookie.
+              schema:
+                type: string
+                example: refreshToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; HttpOnly;
+        "400":
+          description: The request headers missing required tokens.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+              example:
+                error: "Bad Request"
+                message: "The headers are missing required tokens."
+                missingFields: ["refreshToken"]
+        "401":
+          description: The refresh token is invalid, expired, or revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Unauthorized"
+                message: "The provided refresh token is invalid, expired, or revoked."
+        "429":
+          description: Too many requests. Please try again later.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Too Many Requests"
+                message: "You have made too many requests in the past 5 minutes. Please try again later."
+        "500":
+          description: A server-side error occurred while refreshing the token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Internal Server Error"
+                message: "An error occurred while processing your request. Please try again later."
+
 components:
   schemas:
     Error:
