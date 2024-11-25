@@ -146,7 +146,7 @@ paths:
               password: "12345678"
       responses:
         "200":
-          description: The user has been registered and we sent a verification email.
+          description: The user's password has been changed and we sent an email.
           content:
             application/json:
               schema:
@@ -202,9 +202,59 @@ paths:
               example: 
                 error: "Internal Server Error"
                 message: "An error occurred while processing your request. Please try again later."
-
-
-
+  /verification/email:
+    get:
+      summary: Verify the email of the account associated to the verification token.
+      parameters:
+        - $ref: "#/components/parameters/VerificationToken"
+      responses:
+        "200":
+          description: The user's email has been verified and we sent an email.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: 
+                    type: string
+              example:
+                message: Your email has been successfully verified.
+        "401":
+          description: The verification token is invalid or expired.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Unauthorized"
+                message: "The verification token is invalid or expired. Please request a new email verification."
+        "404":
+          description: The account associated with the verification token could not be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: 
+                error: "Not Found"
+                message:  "No account was found associated with this verification token."
+        "429":
+          description: Too many requests. Please try again later.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Too Many Requests"
+                message: "You have made too many requests in the past 5 minutes. Please try again later."
+        "500":
+          description: A server-side error occurred while processing the email verification request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: 
+                error: "Internal Server Error"
+                message: "An error occurred while processing your request. Please try again later."
 
 components:
   schemas:
@@ -261,7 +311,14 @@ components:
     RecoveryToken:
       name: recovery_token
       in: query
-      description: The value of the password recovery token.
+      description: The value of the recovery token.
+      required: true
+      schema:
+        type: string
+    VerificationToken:
+      name: verification_token
+      in: query
+      description: The value of the verification token.
       required: true
       schema:
         type: string
