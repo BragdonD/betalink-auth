@@ -451,7 +451,46 @@ paths:
               example:
                 error: "Internal Server Error"
                 message: "An error occurred while processing your request. Please try again later."
-
+  /logout:
+    get:
+      summary: Logout the authenticated user and invalidate his tokens for this session.
+      parameters:
+        - in: header
+          name: Authentication
+          required: true
+          schema:
+            type: string
+            description: The access token issued during login.  
+      responses:
+        "200":
+          description: The user has been successfully logged out.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                example:
+                  message: "You have been successfully logged out."
+        "401":
+          description: The user is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Unauthorized"
+                message: "Authentication is required to access this resource."
+        "500":
+          description: A server-side error occurred during the logout process.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Internal Server Error"
+                message: "An error occurred while processing your logout request. Please try again later."  
 components:
   schemas:
     Error:
