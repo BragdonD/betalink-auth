@@ -1,0 +1,116 @@
+openapi: '3.0.3'
+info:
+  title: Beta Link - Auth µService API
+  version: '0.1'
+servers:
+  - url: https://api.auth.betalink.com/
+paths:
+  /login:
+    post:
+      summary: Authenticate the user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserLoginData"
+            examples:
+              email:
+                value:
+                  username: "john.doe@gmail.com"
+                  password: "12345678"
+              username:
+                value:
+                  username: "johndoe"
+                  password: "12345678"
+      responses:
+        "200":
+          description: The user has been successfully authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAccessData"
+        "400":
+          description: The request payload is missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+              example:
+                error: "Bad Request"
+                message: "The payload is missing some required fields."
+                missingFields: ["email", "password"]
+        "401":
+          description: The credentials do not match any account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: 
+                error: "Unauthorized"
+                message: "The credentials do not match any account."
+        "403":
+          description: The user's account is not verified.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: 
+                error: "Forbidden"
+                message: "Account not verified. Please validate your email."
+        "500":
+          description: A server-side error occurred during login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: 
+                error: "Internal Server Error"
+                message: "An error occurred while processing your request. Please try again later."
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: A short error type identifier.
+        message:
+          type: string
+          description: A detailed error message.
+    BadRequestError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            missingFields:
+              type: array
+              items:
+                type: string
+              description: Fields missing from the request payload.
+          example:
+            error: "Bad Request"
+            message: "The payload is missing some required fields."
+            missingFields: ["email", "password"]
+    UserLoginData:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      example:
+        username: "john.doe@gmail.com"
+        password: "12345678"
+    UserAccessData:
+      type: object
+      properties:
+        access_token: 
+          type: string
+        refresh_token: 
+          type: string
+        expire: 
+          type: integer
+        
+    
