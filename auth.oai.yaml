@@ -451,6 +451,68 @@ paths:
               example:
                 error: "Internal Server Error"
                 message: "An error occurred while processing your request. Please try again later."
+  /token/validate:
+    get:
+      summary: Verifies the validity of the access token to determine if the user is authenticated.
+      parameters:
+        - in: header
+          name: Authentication
+          required: true
+          schema:
+            type: string
+            description: The access token issued during login.  
+      responses:
+        "200":
+          description: The access token is valid, and the user is authenticated.
+          # TODO: add roles to the microservices to allow only certain user to access to some functionalities
+          # 
+          # content:
+          #   application/json:
+          #     schema:
+          #       type: object
+          #       properties:
+          #         valid:
+          #           type: boolean
+          #           description: Indicates if the token is valid.
+          #         userId:
+          #           type: string
+          #           description: The unique identifier of the authenticated user.
+          #         roles:
+          #           type: array
+          #           items:
+          #             type: string
+          #           description: The roles or permissions associated with the user.
+          #       example:
+          #         valid: true
+          #         userId: "12345"
+          #         roles: ["admin", "editor"]
+        "401":
+          description: The access token is invalid, expired, or missing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Unauthorized"
+                message: "The access token is invalid, expired, or missing."
+        "429":
+          description: Too many requests. Please try again later.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Too Many Requests"
+                message: "You have made too many requests in the past 5 minutes. Please try again later."
+        "500":
+          description: A server-side error occurred while validating the token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Internal Server Error"
+                message: "An error occurred while processing your request. Please try again later."
   /logout:
     get:
       summary: Logout the authenticated user and invalidate his tokens for this session.
@@ -563,5 +625,3 @@ components:
       schema:
         type: string
         enum: [google, facebook, apple]
-      
-    
