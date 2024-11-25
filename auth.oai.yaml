@@ -195,6 +195,66 @@ paths:
               example: 
                 error: "Internal Server Error"
                 message: "An error occurred while processing your request. Please try again later."
+  /register/external/{provider}:
+    post:
+      summary: Register a new user account via an external provider
+      parameters:
+        - $ref: "#/components/parameters/ExternalProvider"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExternalLoginData"
+      responses:
+        "200":
+          description: The user has been registered with the external provider.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: Your account has been created with the external provider.
+        "400":
+          description: The request payload is missing required fields or is malformed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+              example:
+                error: "Bad Request"
+                message: "The payload is missing some required fields."
+                missingFields: ["token"]
+        "409":
+          description: The provided email is invalid or already in use.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Conflict"
+                message: "The provided email is invalid or already in use. Please check and try again."
+        "429":
+          description: Too many requests. Please try again later.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Too Many Requests"
+                message: "You have made too many requests in the past 5 minutes. Please try again later."
+        "500":
+          description: A server-side error occurred while registering with the external provider.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Internal Server Error"
+                message: "An error occurred while processing your request. Please try again later."
   /recovery/password:
     patch:
       summary: Reset the password of the account associated to the recovery token.
