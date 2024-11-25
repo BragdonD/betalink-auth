@@ -70,6 +70,70 @@ paths:
               example: 
                 error: "Internal Server Error"
                 message: "An error occurred while processing your request. Please try again later."
+  /login/external/{provider}:
+    post:
+      summary: Authenticate the user via an external provider.
+      parameters:
+        - $ref: "#/components/parameters/ExternalProvider"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExternalLoginData"
+      responses:
+        "200":
+          description: The user has been successfully authenticated with the external provider
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAccessData"
+        "400":
+          description: The request payload is missing required fields or is malformed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+              example:
+                error: "Bad Request"
+                message: "The payload is missing some required fields."
+                missingFields: ["token"]
+        "401":
+          description: The external token is invalid or expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: 
+                error: "Unauthorized"
+                message: "The external token is invalid or expired."
+        "403":
+          description: The user's external account is not verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Forbidden"
+                message: "Account not verified with external provider. Please complete the verification process."
+        "429":
+          description: Too many requests. Please try again later.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Too Many Requests"
+                message: "You have made too many requests in the past 5 minutes. Please try again later."
+        "500":
+          description: A server-side error occurred during authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Internal Server Error"
+                message: "An error occurred while processing your request. Please try again later."
   /register:
     post:
       summary: Register a new user account
@@ -291,6 +355,13 @@ components:
       example:
         username: "john.doe@gmail.com"
         password: "12345678"
+    ExternalLoginData:
+      type: object
+      properties:
+        token:
+          type: string
+      example:
+        token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTIzNDU2Nzg5MCIsIm5hbWUiOiJKb2huIERvZSJ9.Tm__Ymx-4FgWsd1zdb-WxMPojmK4Vmpx"
     UserPassword:
       type: object
       properties:
@@ -322,5 +393,13 @@ components:
       required: true
       schema:
         type: string
+    ExternalProvider:
+      name: provider
+      in: path
+      required: true
+      description: The external provider to authenticate with
+      schema:
+        type: string
+        enum: [google, facebook, apple]
       
     
