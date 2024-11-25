@@ -14,15 +14,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/UserLoginData"
-            examples:
-              email:
-                value:
-                  username: "john.doe@gmail.com"
-                  password: "12345678"
-              username:
-                value:
-                  username: "johndoe"
-                  password: "12345678"
+            example:
+              username: "john.doe@gmail.com"
+              password: "12345678"
       responses:
         "200":
           description: The user has been successfully authenticated
@@ -67,6 +61,61 @@ paths:
               example: 
                 error: "Internal Server Error"
                 message: "An error occurred while processing your request. Please try again later."
+  /register:
+    post:
+      summary: Register a new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserLoginData"
+            example:
+              username: "john.doe@gmail.com"
+              password: "12345678"
+      responses:
+        "200":
+          description: The user has been registered and we sent a verification email.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: 
+                    type: string
+              example:
+                message: Your account has been created and an verification email was sent to your email address. Please verify it before your first login.
+        "400":
+          description: The request payload is missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+              example:
+                error: "Bad Request"
+                message: "The payload is missing some required fields."
+                missingFields: ["email", "password"]
+        "409":
+          description: The provided email is invalid or already in use.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: 
+                error: "Conflict"
+                message:  "The provided email is invalid or already in use. Please check and try again."
+        "500":
+          description: A server-side error occurred during login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: 
+                error: "Internal Server Error"
+                message: "An error occurred while processing your request. Please try again later."
+
+
+
 
 components:
   schemas:
@@ -96,7 +145,7 @@ components:
     UserLoginData:
       type: object
       properties:
-        username:
+        email:
           type: string
         password:
           type: string
