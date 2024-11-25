@@ -123,7 +123,78 @@ paths:
                 error: "Too Many Requests"
                 message: "You have made too many requests in the past 5 minutes. Please try again later."
         "500":
-          description: A server-side error occurred during login.
+          description: A server-side error occurred while registering.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: 
+                error: "Internal Server Error"
+                message: "An error occurred while processing your request. Please try again later."
+  /recovery/password:
+    get:
+      summary: Reset the password of the account associated to the recovery token.
+      parameters:
+        - $ref: "#/components/parameters/RecoveryToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserPassword"
+            example:
+              password: "12345678"
+      responses:
+        "200":
+          description: The user has been registered and we sent a verification email.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: 
+                    type: string
+              example:
+                message: Your password has been successfully reset.
+        "400":
+          description: The request payload is missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BadRequestError"
+              example:
+                error: "Bad Request"
+                message: "The payload is missing some required fields."
+                missingFields: ["password"]
+        "401":
+          description: The recovery token is invalid or expired.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Unauthorized"
+                message: "The recovery token is invalid or expired. Please request a new password reset."
+        "404":
+          description: The account associated with the recovery token could not be found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: 
+                error: "Not Found"
+                message:  "No account was found associated with this recovery token."
+        "429":
+          description: Too many requests. Please try again later.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Too Many Requests"
+                message: "You have made too many requests in the past 5 minutes. Please try again later."
+        "500":
+          description: A server-side error occurred while processing the password reset request.
           content:
             application/json:
               schema:
@@ -170,6 +241,13 @@ components:
       example:
         username: "john.doe@gmail.com"
         password: "12345678"
+    UserPassword:
+      type: object
+      properties:
+        password:
+          type: string
+      example:
+        password: "12345678"
     UserAccessData:
       type: object
       properties:
@@ -179,5 +257,13 @@ components:
           type: string
         expire: 
           type: integer
-        
+  parameters:
+    RecoveryToken:
+      name: recovery_token
+      in: query
+      description: The value of the password recovery token.
+      required: true
+      schema:
+        type: string
+      
     
