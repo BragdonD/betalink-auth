@@ -52,6 +52,15 @@ paths:
               example: 
                 error: "Forbidden"
                 message: "Account not verified. Please validate your email."
+        "429":
+          description: Too many requests. Please try again later.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Too Many Requests"
+                message: "You have made too many requests in the past 5 minutes. Please try again later."
         "500":
           description: A server-side error occurred during login.
           content:
@@ -104,6 +113,15 @@ paths:
               example: 
                 error: "Conflict"
                 message:  "The provided email is invalid or already in use. Please check and try again."
+        "429":
+          description: Too many requests. Please try again later.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Too Many Requests"
+                message: "You have made too many requests in the past 5 minutes. Please try again later."
         "500":
           description: A server-side error occurred during login.
           content:
