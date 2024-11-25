@@ -20,10 +20,16 @@ paths:
       responses:
         "200":
           description: The user has been successfully authenticated
-          content:
-            application/json:
+          headers:
+            Authentication: 
               schema:
-                $ref: "#/components/schemas/UserAccessData"
+                type: string
+              description: The access token representing the user's identity.
+            Set-Cookie:
+              description: Sets the refresh token in an HTTP-only cookie.
+              schema:
+                type: string
+                example: refreshToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; HttpOnly;
         "400":
           description: The request payload is missing required fields
           content:
@@ -84,10 +90,16 @@ paths:
       responses:
         "200":
           description: The user has been successfully authenticated with the external provider
-          content:
-            application/json:
+          headers:
+            Authentication: 
               schema:
-                $ref: "#/components/schemas/UserAccessData"
+                type: string
+              description: The access token representing the user's identity.
+            Set-Cookie:
+              description: Sets the refresh token in an HTTP-only cookie.
+              schema:
+                type: string
+                example: refreshToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; HttpOnly;
         "400":
           description: The request payload is missing required fields or is malformed
           content:
@@ -379,7 +391,7 @@ paths:
               example: 
                 error: "Internal Server Error"
                 message: "An error occurred while processing your request. Please try again later."
-
+ 
 components:
   schemas:
     Error:
@@ -429,15 +441,6 @@ components:
           type: string
       example:
         password: "12345678"
-    UserAccessData:
-      type: object
-      properties:
-        access_token: 
-          type: string
-        refresh_token: 
-          type: string
-        expire: 
-          type: integer
   parameters:
     RecoveryToken:
       name: recovery_token
