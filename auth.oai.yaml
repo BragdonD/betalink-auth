@@ -196,7 +196,7 @@ paths:
                 error: "Internal Server Error"
                 message: "An error occurred while processing your request. Please try again later."
   /recovery/password:
-    get:
+    patch:
       summary: Reset the password of the account associated to the recovery token.
       parameters:
         - $ref: "#/components/parameters/RecoveryToken"
@@ -267,7 +267,7 @@ paths:
                 error: "Internal Server Error"
                 message: "An error occurred while processing your request. Please try again later."
   /verification/email:
-    get:
+    patch:
       summary: Verify the email of the account associated to the verification token.
       parameters:
         - $ref: "#/components/parameters/VerificationToken"
