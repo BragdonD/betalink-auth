@@ -76,3 +76,26 @@ func (u *Usecases) RegisterUser(ctx context.Context, firstname, lastname, email,
 
 	return nil
 }
+
+// LoginUser checks the user credentials
+func (u *Usecases) LoginUser(ctx context.Context, email, password string) error {
+	u.logger.Info("Logging in user")
+	// get login data
+	loginData, err := u.queries.GetLoginDataByEmail(ctx, email)
+	if err != nil {
+		return &ServerError{
+			Message: fmt.Errorf("could not get login data: %w", err).Error(),
+		}
+	}
+
+	// check password
+	if err := ComparePassword(password, loginData.Passwordhash); err != nil {
+		return &ValidationError{
+			Message: fmt.Errorf("could not compare password: %w", err).Error(),
+		}
+	}
+
+	// create refresh and access tokens
+
+	return nil
+}

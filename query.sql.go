@@ -94,3 +94,20 @@ func (q *Queries) GetLoginDataByEmail(ctx context.Context, email string) (Usersl
 	)
 	return i, err
 }
+
+const getUserById = `-- name: GetUserById :one
+SELECT user_id, first_name, last_name FROM Users WHERE user_id = $1
+`
+
+type GetUserByIdRow struct {
+	UserID    pgtype.UUID
+	FirstName string
+	LastName  string
+}
+
+func (q *Queries) GetUserById(ctx context.Context, userID pgtype.UUID) (GetUserByIdRow, error) {
+	row := q.db.QueryRow(ctx, getUserById, userID)
+	var i GetUserByIdRow
+	err := row.Scan(&i.UserID, &i.FirstName, &i.LastName)
+	return i, err
+}
