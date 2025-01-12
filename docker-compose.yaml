@@ -1,0 +1,14 @@
+services:
+  betalink-auth-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: betalinkauth
+      POSTGRES_PASSWORD: betalinkauth
+      POSTGRES_DB: betalinkauth
+    ports:
+      - "5432:5432"
+    volumes:
+      - betalink-auth-db-data:/var/lib/postgresql/data
+
+volumes:
+  betalink-auth-db-data:
