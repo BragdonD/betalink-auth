@@ -12,3 +12,6 @@ INSERT INTO EmailVerification (user_id, verification_token) VALUES ($1, $2);
 
 -- name: GetLoginDataByEmail :one
 SELECT user_id, email, passwordHash, passwordSalt, hashAlgorithm FROM UsersLoginData WHERE email = $1;
+
+-- name: GetUserById :one
+SELECT user_id, first_name, last_name FROM Users WHERE user_id = $1;
