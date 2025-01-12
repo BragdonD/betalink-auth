@@ -16,6 +16,12 @@ type registerUserDto struct {
 	Password  string `json:"password"`
 }
 
+// loginUserDto is the data transfer object for logging in a user
+type loginUserDto struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 // Router is the http router for the auth service
 type Router struct {
 	logger   *betalinklogger.Logger
@@ -32,11 +38,12 @@ func NewRouter(logger *betalinklogger.Logger, ginRouter *gin.Engine, usecases *U
 	}
 
 	ginRouter.POST("/register", router.registerUser)
+	ginRouter.POST("/login", router.loginUser)
 
 	return router
 }
 
-// registerUser handle the http request to register a
+// registerUser handles the http request to register a
 // new user in the database
 func (r *Router) registerUser(ctx *gin.Context) {
 	r.logger.Info("Registering user")
@@ -52,6 +59,34 @@ func (r *Router) registerUser(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusCreated, gin.H{"message": "user registered"})
+}
+
+// loginUser handles the http request to login a user
+func (r *Router) loginUser(ctx *gin.Context) {
+	r.logger.Info("Logging in user")
+	var dto loginUserDto
+	if err := ctx.BindJSON(&dto); err != nil {
+		writeError(ctx, fmt.Errorf("could not bind json: %w", err))
+		return
+	}
+	tokens, err := r.usecases.LoginUser(ctx, dto.Email, dto.Password)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	// Add tokens to the header
+	addToHeader(ctx.Writer.Header(), "Authorization", "Bearer "+tokens.AccessToken)
+	addToHeader(ctx.Writer.Header(), "Refresh-Token", tokens.RefreshToken)
+
+	writeResponse(ctx, http.StatusOK, gin.H{"message": "user logged in"})
+}
+
+// addToHeader adds a key-value pair to the header
+func addToHeader(header http.Header, key, value string) {
+	if header.Get(key) == "" {
+		header.Add(key, value)
+	}
 }
 
 // writeError writes an error response to the client
@@ -70,4 +105,9 @@ func writeError(ctx *gin.Context, err error) {
 			"error": err.Error(),
 		})
 	}
+}
+
+// writeResponse writes a response to the client
+func writeResponse(ctx *gin.Context, status int, data interface{}) {
+	ctx.JSON(status, data)
 }
