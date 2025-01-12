@@ -2,6 +2,7 @@ package betalinkauth
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	betalinklogger "github.com/BragdonD/betalink-logger"
@@ -42,7 +43,10 @@ func (u *Usecases) RegisterUser(ctx context.Context, firstname, lastname, email,
 		}
 	}
 
-	// check email uniqueness
+	err := checkEmailUniqueness(ctx, u.queries, email)
+	if err != nil {
+		return err
+	}
 
 	// create user
 	userParams := CreateUserParams{
@@ -81,6 +85,27 @@ func (u *Usecases) RegisterUser(ctx context.Context, firstname, lastname, email,
 	// TODO: implement email verification
 
 	return nil
+}
+
+// checkEmailUniqueness checks if an email is unique in the database
+func checkEmailUniqueness(ctx context.Context, queries *Queries, email string) error {
+	// Attempt to get login data by email
+	_, err := queries.GetLoginDataByEmail(ctx, email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// Email does not exist; it's unique
+			return nil
+		}
+		// Handle other unexpected errors
+		return &ServerError{
+			Message: fmt.Errorf("could not get login data by email: %w", err).Error(),
+		}
+	}
+
+	// Email already exists
+	return &ValidationError{
+		Message: fmt.Sprintf("email [%s] is not available", email),
+	}
 }
 
 // LoginUser checks the user credentials
