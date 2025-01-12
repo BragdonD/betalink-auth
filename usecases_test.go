@@ -196,13 +196,13 @@ func TestUsecases_LoginUser(t *testing.T) {
 
 	log.Println("User registered")
 
-	if err := usecases.LoginUser(testCtx,
+	if _, err := usecases.LoginUser(testCtx,
 		"johndoe@gmail.com", "D.Ft[SHn5dLNb-wy=v'~$7"); err != nil {
 		t.Fatalf("could not login user: %v", err)
 		return
 	}
 
-	if err := usecases.LoginUser(testCtx,
+	if _, err := usecases.LoginUser(testCtx,
 		"johndoe@gmail.com", "testPassword"); err == nil {
 		t.Fatalf("user can login with wrong password: %v", err)
 		return

@@ -7,6 +7,12 @@ import (
 	betalinklogger "github.com/BragdonD/betalink-logger"
 )
 
+// IDTokens is a struct containing the access and refresh tokens
+type IDTokens struct {
+	AccessToken  string
+	RefreshToken string
+}
+
 // Usecases is the usecases for the auth service
 type Usecases struct {
 	logger  *betalinklogger.Logger
@@ -78,24 +84,35 @@ func (u *Usecases) RegisterUser(ctx context.Context, firstname, lastname, email,
 }
 
 // LoginUser checks the user credentials
-func (u *Usecases) LoginUser(ctx context.Context, email, password string) error {
+func (u *Usecases) LoginUser(ctx context.Context, email, password string) (*IDTokens, error) {
 	u.logger.Info("Logging in user")
 	// get login data
 	loginData, err := u.queries.GetLoginDataByEmail(ctx, email)
 	if err != nil {
-		return &ServerError{
+		return nil, &ServerError{
 			Message: fmt.Errorf("could not get login data: %w", err).Error(),
 		}
 	}
 
 	// check password
 	if err := ComparePassword(password, loginData.Passwordhash); err != nil {
-		return &ValidationError{
+		return nil, &ValidationError{
 			Message: fmt.Errorf("could not compare password: %w", err).Error(),
 		}
 	}
 
 	// create refresh and access tokens
+	// TODO: implement roles
+	// TODO: implement secret
+	accessToken, err := GenerateAccessToken(loginData.UserID.String(), []string{"user"}, "mysecret")
+	if err != nil {
+		return nil, &ServerError{
+			Message: fmt.Errorf("could not generate access token: %w", err).Error(),
+		}
+	}
 
-	return nil
+	return &IDTokens{
+		AccessToken:  accessToken,
+		RefreshToken: "",
+	}, nil
 }
