@@ -2,12 +2,12 @@ package betalinkauth
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"reflect"
 	"time"
 
 	betalinklogger "github.com/BragdonD/betalink-logger"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -95,7 +95,7 @@ func checkEmailUniqueness(ctx context.Context, queries *Queries, email string) e
 	// Attempt to get login data by email
 	_, err := queries.GetLoginDataByEmail(ctx, email)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			// Email does not exist; it's unique
 			return nil
 		}
