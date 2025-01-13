@@ -39,6 +39,29 @@ func (q *Queries) CreatePasswordRecovery(ctx context.Context, arg CreatePassword
 	return err
 }
 
+const createSession = `-- name: CreateSession :one
+INSERT INTO Sessions (user_id, created_at, updated_at, expires_at) VALUES ($1, $2, $3, $4) RETURNING session_id
+`
+
+type CreateSessionParams struct {
+	UserID    pgtype.UUID
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+	ExpiresAt pgtype.Timestamptz
+}
+
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, createSession,
+		arg.UserID,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+		arg.ExpiresAt,
+	)
+	var session_id pgtype.UUID
+	err := row.Scan(&session_id)
+	return session_id, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO Users (first_name, last_name) VALUES ($1, $2) RETURNING user_id
 `
@@ -78,6 +101,15 @@ func (q *Queries) CreateUserLoginData(ctx context.Context, arg CreateUserLoginDa
 	return err
 }
 
+const deleteSession = `-- name: DeleteSession :exec
+DELETE FROM Sessions WHERE session_id = $1
+`
+
+func (q *Queries) DeleteSession(ctx context.Context, sessionID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSession, sessionID)
+	return err
+}
+
 const getLoginDataByEmail = `-- name: GetLoginDataByEmail :one
 SELECT user_id, email, passwordHash, passwordSalt, hashAlgorithm FROM UsersLoginData WHERE email = $1
 `
@@ -91,6 +123,23 @@ func (q *Queries) GetLoginDataByEmail(ctx context.Context, email string) (Usersl
 		&i.Passwordhash,
 		&i.Passwordsalt,
 		&i.Hashalgorithm,
+	)
+	return i, err
+}
+
+const getSession = `-- name: GetSession :one
+SELECT session_id, user_id, created_at, updated_at, expires_at FROM Sessions WHERE session_id = $1
+`
+
+func (q *Queries) GetSession(ctx context.Context, sessionID pgtype.UUID) (Session, error) {
+	row := q.db.QueryRow(ctx, getSession, sessionID)
+	var i Session
+	err := row.Scan(
+		&i.SessionID,
+		&i.UserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
 }

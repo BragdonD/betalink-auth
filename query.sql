@@ -15,3 +15,12 @@ SELECT user_id, email, passwordHash, passwordSalt, hashAlgorithm FROM UsersLogin
 
 -- name: GetUserById :one
 SELECT user_id, first_name, last_name FROM Users WHERE user_id = $1;
+
+-- name: CreateSession :one
+INSERT INTO Sessions (user_id, created_at, updated_at, expires_at) VALUES ($1, $2, $3, $4) RETURNING session_id;
+
+-- name: GetSession :one
+SELECT session_id, user_id, created_at, updated_at, expires_at FROM Sessions WHERE session_id = $1;
+
+-- name: DeleteSession :exec
+DELETE FROM Sessions WHERE session_id = $1;

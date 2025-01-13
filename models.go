@@ -32,6 +32,14 @@ type Passwordrecovery struct {
 	Used          bool
 }
 
+type Session struct {
+	SessionID pgtype.UUID
+	UserID    pgtype.UUID
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+	ExpiresAt pgtype.Timestamptz
+}
+
 type User struct {
 	UserID    pgtype.UUID
 	FirstName string

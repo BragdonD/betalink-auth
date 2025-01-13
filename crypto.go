@@ -82,3 +82,42 @@ func ValidateAccessToken(token, secret string) (jwt.MapClaims, error) {
 
 	return claims, nil
 }
+
+// GenerateRefreshToken generates a refresh token
+func GenerateRefreshToken(sessionID string, createdAt, expiresAt time.Time, secret string) (string, error) {
+	// Define claims
+	claims := map[string]interface{}{
+		"session_id": sessionID,
+		"exp":        expiresAt.Unix(),
+		"iat":        createdAt.Unix(),
+		"iss":        "betalink-auth",
+		"aud":        "betalink",
+	}
+
+	// Generate the JWT using the helper function
+	return GenerateJWT(claims, secret)
+}
+
+// ValidateRefreshToken validates a refresh token
+func ValidateRefreshToken(token, secret string) (jwt.MapClaims, error) {
+	// Parse the token
+	parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not parse token: %w", err)
+	}
+
+	// Check if the token is valid
+	if !parsedToken.Valid {
+		return nil, fmt.Errorf("token is invalid")
+	}
+
+	// Extract the claims
+	claims, ok := parsedToken.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("could not extract claims from token")
+	}
+
+	return claims, nil
+}

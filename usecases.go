@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"reflect"
+	"time"
 
 	betalinklogger "github.com/BragdonD/betalink-logger"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // IDTokens is a struct containing the access and refresh tokens
@@ -96,6 +99,7 @@ func checkEmailUniqueness(ctx context.Context, queries *Queries, email string) e
 			// Email does not exist; it's unique
 			return nil
 		}
+		fmt.Println(reflect.TypeOf(err))
 		// Handle other unexpected errors
 		return &ServerError{
 			Message: fmt.Errorf("could not get login data by email: %w", err).Error(),
@@ -136,8 +140,41 @@ func (u *Usecases) LoginUser(ctx context.Context, email, password string) (*IDTo
 		}
 	}
 
+	createSessionParams := CreateSessionParams{
+		UserID: loginData.UserID,
+		CreatedAt: pgtype.Timestamptz{
+			Time:  time.Now(),
+			Valid: true,
+		},
+		UpdatedAt: pgtype.Timestamptz{
+			Time:  time.Now(),
+			Valid: true,
+		},
+		ExpiresAt: pgtype.Timestamptz{
+			Time:  time.Now().Add(time.Hour * 24), // TODO: make this configurable
+			Valid: true,
+		},
+	}
+	sessionID, err := u.queries.CreateSession(ctx, createSessionParams)
+	if err != nil {
+		return nil, &ServerError{
+			Message: fmt.Errorf("could not create session: %w", err).Error(),
+		}
+	}
+	refreshToken, err := GenerateRefreshToken(
+		sessionID.String(),
+		createSessionParams.CreatedAt.Time,
+		createSessionParams.ExpiresAt.Time,
+		"mysecret",
+	)
+	if err != nil {
+		return nil, &ServerError{
+			Message: fmt.Errorf("could not generate refresh token: %w", err).Error(),
+		}
+	}
+
 	return &IDTokens{
 		AccessToken:  accessToken,
-		RefreshToken: "",
+		RefreshToken: refreshToken,
 	}, nil
 }
