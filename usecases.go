@@ -7,9 +7,17 @@ import (
 	"time"
 
 	betalinklogger "github.com/BragdonD/betalink-logger"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// UserData represents the user information retrieved from the auth server
+type UserData struct {
+	UserID    pgtype.UUID
+	FirstName string
+	LastName  string
+}
 
 // IDTokens is a struct containing the access and refresh tokens
 type IDTokens struct {
@@ -176,5 +184,61 @@ func (u *Usecases) LoginUser(ctx context.Context, email, password string) (*IDTo
 	return &IDTokens{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
+	}, nil
+}
+
+// ValidateAccessToken validates an access token
+func (u *Usecases) ValidateAccessToken(ctx context.Context, accessToken string) (*UserData, error) {
+	// validate access token
+	claims, err := ValidateAccessToken(accessToken, "mysecret")
+	if err != nil {
+		return nil, &ValidationError{
+			Message: fmt.Errorf("could not validate access token: %w", err).Error(),
+		}
+	}
+
+	expiresAt, err := claims.GetExpirationTime()
+	if err != nil {
+		return nil, &ValidationError{
+			Message: fmt.Errorf("could not get expiration time: %w", err).Error(),
+		}
+	}
+
+	// check if token is expired
+	if expiresAt.Time.Before(time.Now()) {
+		return nil, &ValidationError{
+			Message: "access token is expired",
+		}
+	}
+
+	// get user ID
+	userID, ok := claims["user_id"].(string)
+	if !ok {
+		return nil, &ValidationError{
+			Message: "could not get user ID from claims",
+		}
+	}
+	parsedUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, &ValidationError{
+			Message: "invalid UUID format",
+		}
+	}
+	pgUUID := pgtype.UUID{
+		Bytes: parsedUUID,
+		Valid: true,
+	}
+
+	user, err := u.queries.GetUserById(ctx, pgUUID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get user by ID: %w", err)
+	}
+
+	u.logger.Info("user: %v", user)
+
+	return &UserData{
+		UserID:    user.UserID,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
 	}, nil
 }

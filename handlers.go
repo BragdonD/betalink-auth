@@ -3,6 +3,7 @@ package betalinkauth
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	betalinklogger "github.com/BragdonD/betalink-logger"
 	"github.com/gin-gonic/gin"
@@ -10,8 +11,8 @@ import (
 
 // registerUserDto is the data transfer object for registering a new user
 type registerUserDto struct {
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
+	FirstName string `json:"firstname"`
+	LastName  string `json:"lastname"`
 	Email     string `json:"email"`
 	Password  string `json:"password"`
 }
@@ -39,6 +40,7 @@ func NewRouter(logger *betalinklogger.Logger, ginRouter *gin.Engine, usecases *U
 
 	ginRouter.POST("/register", router.registerUser)
 	ginRouter.POST("/login", router.loginUser)
+	ginRouter.GET("/token/validate", router.validateAccessToken)
 
 	return router
 }
@@ -80,6 +82,32 @@ func (r *Router) loginUser(ctx *gin.Context) {
 	addToHeader(ctx.Writer.Header(), "Refresh-Token", tokens.RefreshToken)
 
 	writeResponse(ctx, http.StatusOK, gin.H{"message": "user logged in"})
+}
+
+// validateAccessToken handles the http request to validate an access token
+func (r *Router) validateAccessToken(ctx *gin.Context) {
+	r.logger.Info("Validating access token")
+	authHeader := ctx.GetHeader("Authorization")
+	if authHeader == "" {
+		writeError(ctx, fmt.Errorf("access token is required"))
+		return
+	}
+	// Validate the format of the Authorization header
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header format"})
+		ctx.Abort()
+		return
+	}
+	accessToken := parts[1]
+
+	user, err := r.usecases.ValidateAccessToken(ctx, accessToken)
+	if err != nil {
+		writeError(ctx, err)
+		return
+	}
+
+	writeResponse(ctx, http.StatusOK, user)
 }
 
 // addToHeader adds a key-value pair to the header
