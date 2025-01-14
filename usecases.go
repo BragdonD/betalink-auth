@@ -234,8 +234,6 @@ func (u *Usecases) ValidateAccessToken(ctx context.Context, accessToken string) 
 		return nil, fmt.Errorf("could not get user by ID: %w", err)
 	}
 
-	u.logger.Info("user: %v", user)
-
 	return &UserData{
 		UserID:    user.UserID,
 		FirstName: user.FirstName,
