@@ -206,9 +206,7 @@ func (u *Usecases) ValidateAccessToken(ctx context.Context, accessToken string) 
 
 	// check if token is expired
 	if expiresAt.Time.Before(time.Now()) {
-		return nil, &ValidationError{
-			Message: "access token is expired",
-		}
+		return nil, ExpiredTokenError
 	}
 
 	// get user ID

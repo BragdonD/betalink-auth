@@ -118,7 +118,7 @@ func (r *Router) validateAccessToken(ctx *gin.Context) {
 			http.StatusUnauthorized,
 			false,
 			nil,
-			fmt.Errorf("Authorization header is required"),
+			fmt.Errorf("authorization header is required"),
 		)
 		return
 	}
@@ -130,7 +130,7 @@ func (r *Router) validateAccessToken(ctx *gin.Context) {
 			http.StatusUnauthorized,
 			false,
 			nil,
-			fmt.Errorf("Invalid Authorization header format"),
+			fmt.Errorf("invalid Authorization header format"),
 		)
 		return
 	}
@@ -138,6 +138,12 @@ func (r *Router) validateAccessToken(ctx *gin.Context) {
 
 	user, err := r.usecases.ValidateAccessToken(ctx, accessToken)
 	if err != nil {
+		if err == ExpiredTokenError {
+			// redirect to refresh token endpoint
+			ctx.Redirect(http.StatusUnauthorized, "/token/refresh")
+			return
+		}
+
 		statusCode := getErrorStatusCode(err)
 		writeResponse(
 			ctx,
