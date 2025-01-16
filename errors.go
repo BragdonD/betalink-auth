@@ -21,3 +21,10 @@ type ValidationError struct {
 func (e *ValidationError) Error() string {
 	return e.Message
 }
+
+var (
+	// ExpiredTokenError is an error that represents an expired token
+	ExpiredTokenError = &ValidationError{
+		Message: "Token has expired",
+	}
+)

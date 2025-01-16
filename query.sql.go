@@ -39,6 +39,29 @@ func (q *Queries) CreatePasswordRecovery(ctx context.Context, arg CreatePassword
 	return err
 }
 
+const createSession = `-- name: CreateSession :one
+INSERT INTO Sessions (user_id, created_at, updated_at, expires_at) VALUES ($1, $2, $3, $4) RETURNING session_id
+`
+
+type CreateSessionParams struct {
+	UserID    pgtype.UUID
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+	ExpiresAt pgtype.Timestamptz
+}
+
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, createSession,
+		arg.UserID,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+		arg.ExpiresAt,
+	)
+	var session_id pgtype.UUID
+	err := row.Scan(&session_id)
+	return session_id, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO Users (first_name, last_name) VALUES ($1, $2) RETURNING user_id
 `
@@ -78,6 +101,15 @@ func (q *Queries) CreateUserLoginData(ctx context.Context, arg CreateUserLoginDa
 	return err
 }
 
+const deleteSession = `-- name: DeleteSession :exec
+DELETE FROM Sessions WHERE session_id = $1
+`
+
+func (q *Queries) DeleteSession(ctx context.Context, sessionID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSession, sessionID)
+	return err
+}
+
 const getLoginDataByEmail = `-- name: GetLoginDataByEmail :one
 SELECT user_id, email, passwordHash, passwordSalt, hashAlgorithm FROM UsersLoginData WHERE email = $1
 `
@@ -91,6 +123,23 @@ func (q *Queries) GetLoginDataByEmail(ctx context.Context, email string) (Usersl
 		&i.Passwordhash,
 		&i.Passwordsalt,
 		&i.Hashalgorithm,
+	)
+	return i, err
+}
+
+const getSessionById = `-- name: GetSessionById :one
+SELECT session_id, user_id, created_at, updated_at, expires_at FROM Sessions WHERE session_id = $1
+`
+
+func (q *Queries) GetSessionById(ctx context.Context, sessionID pgtype.UUID) (Session, error) {
+	row := q.db.QueryRow(ctx, getSessionById, sessionID)
+	var i Session
+	err := row.Scan(
+		&i.SessionID,
+		&i.UserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -110,4 +159,18 @@ func (q *Queries) GetUserById(ctx context.Context, userID pgtype.UUID) (GetUserB
 	var i GetUserByIdRow
 	err := row.Scan(&i.UserID, &i.FirstName, &i.LastName)
 	return i, err
+}
+
+const test_UpdateSessionExpiresAt = `-- name: Test_UpdateSessionExpiresAt :exec
+UPDATE Sessions SET expires_at = $1 WHERE session_id = $2
+`
+
+type Test_UpdateSessionExpiresAtParams struct {
+	ExpiresAt pgtype.Timestamptz
+	SessionID pgtype.UUID
+}
+
+func (q *Queries) Test_UpdateSessionExpiresAt(ctx context.Context, arg Test_UpdateSessionExpiresAtParams) error {
+	_, err := q.db.Exec(ctx, test_UpdateSessionExpiresAt, arg.ExpiresAt, arg.SessionID)
+	return err
 }

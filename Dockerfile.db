@@ -1,0 +1,16 @@
+FROM postgres:17-alpine
+
+# Install pg_cron from the Alpine repository
+RUN apk update && \
+    apk upgrade && \
+    apk add --no-cache postgresql-pg_cron --repository=https://dl-cdn.alpinelinux.org/alpine/v3.18/community
+
+    # Adjust paths for PostgreSQL 17
+RUN ln -s /usr/lib/postgresql17/pg_cron.so /usr/local/lib/postgresql/pg_cron.so && \
+    ln -s /usr/share/postgresql17/extension/pg_cron* /usr/local/share/postgresql/extension
+
+# Set up cron and PostgreSQL configurations
+COPY init-db/pg-cron.sh /docker-entrypoint-initdb.d/pg-cron.sh
+
+RUN chmod +x /docker-entrypoint-initdb.d/pg-cron.sh
+
