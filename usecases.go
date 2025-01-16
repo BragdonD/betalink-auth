@@ -238,3 +238,61 @@ func (u *Usecases) ValidateAccessToken(ctx context.Context, accessToken string) 
 		LastName:  user.LastName,
 	}, nil
 }
+
+func (u *Usecases) RefreshAccessToken(ctx context.Context, refreshToken string) (*IDTokens, error) {
+	// validate refresh token
+	claims, err := ValidateRefreshToken(refreshToken, "mysecret")
+	if err != nil {
+		return nil, &ValidationError{
+			Message: fmt.Errorf("could not validate refresh token: %w", err).Error(),
+		}
+	}
+
+	// get session ID
+	sessionID, ok := claims["session_id"].(string)
+	if !ok {
+		return nil, &ValidationError{
+			Message: "could not get session ID from claims",
+		}
+	}
+	parsedUUID, err := uuid.Parse(sessionID)
+	if err != nil {
+		return nil, &ValidationError{
+			Message: "invalid UUID format",
+		}
+	}
+
+	// get session
+	session, err := u.queries.GetSessionById(ctx, pgtype.UUID{
+		Bytes: parsedUUID,
+		Valid: true,
+	})
+	if err != nil {
+		return nil, &ServerError{
+			Message: fmt.Errorf("could not get session by ID: %w", err).Error(),
+		}
+	}
+
+	// check if session is expired
+	if session.ExpiresAt.Time.Before(time.Now()) {
+		return nil, ExpiredTokenError
+	}
+
+	// create new access token
+	accessToken, err := GenerateAccessToken(
+		session.UserID.String(),
+		[]string{"user"},
+		"mysecret",
+		time.Hour,
+	)
+	if err != nil {
+		return nil, &ServerError{
+			Message: fmt.Errorf("could not generate access token: %w", err).Error(),
+		}
+	}
+
+	return &IDTokens{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
+}

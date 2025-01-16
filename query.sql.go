@@ -127,12 +127,12 @@ func (q *Queries) GetLoginDataByEmail(ctx context.Context, email string) (Usersl
 	return i, err
 }
 
-const getSession = `-- name: GetSession :one
+const getSessionById = `-- name: GetSessionById :one
 SELECT session_id, user_id, created_at, updated_at, expires_at FROM Sessions WHERE session_id = $1
 `
 
-func (q *Queries) GetSession(ctx context.Context, sessionID pgtype.UUID) (Session, error) {
-	row := q.db.QueryRow(ctx, getSession, sessionID)
+func (q *Queries) GetSessionById(ctx context.Context, sessionID pgtype.UUID) (Session, error) {
+	row := q.db.QueryRow(ctx, getSessionById, sessionID)
 	var i Session
 	err := row.Scan(
 		&i.SessionID,
@@ -159,4 +159,18 @@ func (q *Queries) GetUserById(ctx context.Context, userID pgtype.UUID) (GetUserB
 	var i GetUserByIdRow
 	err := row.Scan(&i.UserID, &i.FirstName, &i.LastName)
 	return i, err
+}
+
+const test_UpdateSessionExpiresAt = `-- name: Test_UpdateSessionExpiresAt :exec
+UPDATE Sessions SET expires_at = $1 WHERE session_id = $2
+`
+
+type Test_UpdateSessionExpiresAtParams struct {
+	ExpiresAt pgtype.Timestamptz
+	SessionID pgtype.UUID
+}
+
+func (q *Queries) Test_UpdateSessionExpiresAt(ctx context.Context, arg Test_UpdateSessionExpiresAtParams) error {
+	_, err := q.db.Exec(ctx, test_UpdateSessionExpiresAt, arg.ExpiresAt, arg.SessionID)
+	return err
 }

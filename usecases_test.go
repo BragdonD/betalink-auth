@@ -11,7 +11,9 @@ import (
 
 	betalinkauth "github.com/BragdonD/betalink-auth"
 	betalinklogger "github.com/BragdonD/betalink-logger"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -239,5 +241,75 @@ func TestUsecases_ValidateAccessToken(t *testing.T) {
 		_, err = usecases.ValidateAccessToken(testCtx, expiredToken)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "token is expired")
+	})
+}
+
+func TestUsecases_RefreshAccessToken(t *testing.T) {
+	err := dbContainer.Restore(testCtx)
+	require.NoError(t, err)
+
+	conn, err := createPgxConn()
+	require.NoError(t, err)
+	defer conn.Close(context.Background())
+
+	queries := betalinkauth.New(conn)
+	logger, err := createLogger()
+	require.NoError(t, err)
+
+	usecases := betalinkauth.NewUsecase(logger, queries)
+
+	// Set up a test user and login to get tokens
+	testEmail := "refresh.token@example.com"
+	testPassword := "RefreshToken123!"
+	err = usecases.RegisterUser(testCtx, "Refresh", "Token", testEmail, testPassword)
+	require.NoError(t, err)
+
+	tokens, err := usecases.LoginUser(testCtx, testEmail, testPassword)
+	require.NoError(t, err)
+	require.NotNil(t, tokens)
+
+	t.Run("valid refresh token", func(t *testing.T) {
+		newTokens, err := usecases.RefreshAccessToken(testCtx, tokens.RefreshToken)
+		require.NoError(t, err)
+		require.NotNil(t, newTokens)
+		require.NotEmpty(t, newTokens.AccessToken)
+		require.Equal(t, tokens.RefreshToken, newTokens.RefreshToken)
+	})
+
+	t.Run("invalid refresh token", func(t *testing.T) {
+		_, err := usecases.RefreshAccessToken(testCtx, "invalid-refresh-token")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "could not validate refresh token")
+	})
+
+	t.Run("expired session", func(t *testing.T) {
+		// Manually expire the session in the database
+		sessionClaims, err := betalinkauth.ValidateRefreshToken(
+			tokens.RefreshToken,
+			"mysecret",
+		)
+		require.NoError(t, err)
+		session, err := queries.GetSessionById(testCtx, pgtype.UUID{
+			Bytes: uuid.MustParse(sessionClaims["session_id"].(string)),
+			Valid: true,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, session)
+
+		// Expire the session
+		session.ExpiresAt.Time = time.Now().Add(-1 * time.Hour)
+		updateSessionParams := betalinkauth.Test_UpdateSessionExpiresAtParams{
+			ExpiresAt: pgtype.Timestamptz{
+				Time:  session.ExpiresAt.Time,
+				Valid: true,
+			},
+			SessionID: session.SessionID,
+		}
+		err = queries.Test_UpdateSessionExpiresAt(testCtx, updateSessionParams)
+		require.NoError(t, err)
+
+		_, err = usecases.RefreshAccessToken(testCtx, tokens.RefreshToken)
+		require.Error(t, err)
+		require.Equal(t, err, betalinkauth.ExpiredTokenError)
 	})
 }

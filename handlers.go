@@ -41,6 +41,7 @@ func NewRouter(logger *betalinklogger.Logger, ginRouter *gin.Engine, usecases *U
 	ginRouter.POST("/register", router.registerUser)
 	ginRouter.POST("/login", router.loginUser)
 	ginRouter.GET("/token/validate", router.validateAccessToken)
+	ginRouter.GET("/token/refresh", router.refreshToken)
 
 	return router
 }
@@ -102,9 +103,10 @@ func (r *Router) loginUser(ctx *gin.Context) {
 		return
 	}
 
-	// Add tokens to the headers
-	addToHeader(ctx.Writer.Header(), "Authorization", "Bearer "+tokens.AccessToken)
-	addToHeader(ctx.Writer.Header(), "Refresh-Token", tokens.RefreshToken)
+	if ctx.Writer.Header().Get("Authorization") == "" {
+		ctx.Writer.Header().Add("Authorization", "Bearer "+tokens.AccessToken)
+	}
+	ctx.SetCookie("refresh_token", tokens.RefreshToken, 3600, "/", "localhost", false, true)
 	writeResponse(ctx, http.StatusOK, true, nil, nil)
 }
 
@@ -158,11 +160,44 @@ func (r *Router) validateAccessToken(ctx *gin.Context) {
 	writeResponse(ctx, http.StatusOK, true, user, nil)
 }
 
-// addToHeader adds a key-value pair to the header
-func addToHeader(header http.Header, key, value string) {
-	if header.Get(key) == "" {
-		header.Add(key, value)
+// refreshToken handles the http request to refresh an access token
+func (r *Router) refreshToken(ctx *gin.Context) {
+	r.logger.Info("Refreshing access token")
+	// Get the refresh token from the cookies
+	cookies := ctx.Request.Cookies()
+	var refreshToken string
+	for _, cookie := range cookies {
+		if cookie.Name == "refresh_token" {
+			refreshToken = cookie.Value
+			break
+		}
 	}
+	if refreshToken == "" {
+		writeResponse(
+			ctx,
+			http.StatusUnauthorized,
+			false,
+			nil,
+			fmt.Errorf("refresh token is required"),
+		)
+		return
+	}
+
+	tokens, err := r.usecases.RefreshAccessToken(ctx, refreshToken)
+	if err != nil {
+		statusCode := getErrorStatusCode(err)
+		writeResponse(
+			ctx,
+			statusCode,
+			false,
+			nil,
+			fmt.Errorf("could not refresh access token: %w", err),
+		)
+		return
+	}
+
+	ctx.Writer.Header().Add("Authorization", "Bearer "+tokens.AccessToken)
+	writeResponse(ctx, http.StatusOK, true, nil, nil)
 }
 
 // getErrorStatusCode returns the status code for an error
@@ -179,9 +214,14 @@ func getErrorStatusCode(err error) int {
 
 // writeResponse writes a response to the client
 func writeResponse(ctx *gin.Context, status int, success bool, data interface{}, err error) {
+	var errStr string
+	if err != nil {
+		errStr = err.Error()
+	}
+
 	ctx.JSON(status, gin.H{
 		"success": success,
 		"data":    data,
-		"error":   err.Error(),
+		"error":   errStr,
 	})
 }
