@@ -1,6 +1,6 @@
 -- +goose Up
 
-CREATE EXTENSION "pg_cron";
+-- CREATE EXTENSION IF NOT EXISTS "pg_cron";
 
 CREATE TABLE Sessions (
     session_token TEXT NOT NULL PRIMARY KEY,
@@ -12,4 +12,4 @@ CREATE TABLE Sessions (
 );
 
 -- Delete expired sessions every 20 minutes
-SELECT cron.schedule('session-cleanup', '20 * * * *', 'DELETE FROM Sessions WHERE expires_at < NOW()');
+-- SELECT cron.schedule('session-cleanup', '20 * * * *', 'DELETE FROM Sessions WHERE expires_at < NOW()');
