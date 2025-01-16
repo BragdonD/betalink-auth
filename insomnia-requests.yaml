@@ -1,0 +1,182 @@
+_type: export
+__export_format: 4
+__export_date: 2025-01-16T14:58:55.987Z
+__export_source: insomnia.desktop.app:v10.0.0
+resources:
+  - _id: req_580a600725784d9c965ebf45acd9d067
+    parentId: fld_1dcc02f0ef40493faa966e54c0eb44b4
+    modified: 1737018736314
+    created: 1737017946575
+    url: http://localhost:8080/register
+    name: register-user
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "email": "john.doe@gmail.com",
+          "password": "#drfR%6!",
+        	"firstname": "John",
+        	"lastname": "Doe"
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+      - name: User-Agent
+        value: insomnia/10.0.0
+    authentication:
+      type: none
+    metaSortKey: -1737017949054
+    isPrivate: false
+    pathParameters: []
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: fld_1dcc02f0ef40493faa966e54c0eb44b4
+    parentId: wrk_scratchpad
+    modified: 1737017942808
+    created: 1737017942808
+    name: betalink-auth
+    description: ""
+    environment: {}
+    environmentPropertyOrder: null
+    metaSortKey: -1737017942808
+    _type: request_group
+  - _id: wrk_scratchpad
+    parentId: null
+    modified: 1737017913333
+    created: 1737017913333
+    name: Scratch Pad
+    description: ""
+    scope: collection
+    _type: workspace
+  - _id: req_19176cf6853143f085686d665b761466
+    parentId: fld_1dcc02f0ef40493faa966e54c0eb44b4
+    modified: 1737018790060
+    created: 1737018748379
+    url: http://localhost:8080/login
+    name: login-user
+    description: ""
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"email": "john.doe@gmail.com",
+          "password": "#drfR%6!"
+        }
+    parameters: []
+    headers:
+      - name: Content-Type
+        value: application/json
+      - name: User-Agent
+        value: insomnia/10.0.0
+    authentication: {}
+    metaSortKey: -1737017948954
+    isPrivate: false
+    pathParameters: []
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_a2d4fbdea6d94045816799ff30d8786a
+    parentId: fld_1dcc02f0ef40493faa966e54c0eb44b4
+    modified: 1737018957366
+    created: 1737018911939
+    url: http://localhost:8080/token/validate
+    name: validate-access-token
+    description: ""
+    method: GET
+    body: {}
+    parameters: []
+    headers:
+      - name: User-Agent
+        value: insomnia/10.0.0
+        id: pair_828424938aaf40068311bd43c6478267
+      - id: pair_4285b0876615434fae6420559aa712b5
+        name: Authorization
+        value: "{{ _.auth_token }}"
+        description: ""
+        disabled: false
+    authentication: {}
+    metaSortKey: -1737017948854
+    isPrivate: false
+    pathParameters: []
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: req_2c0641bc0c1a4ee5be2212020343594e
+    parentId: fld_1dcc02f0ef40493faa966e54c0eb44b4
+    modified: 1737037778087
+    created: 1737037738827
+    url: http://localhost:8080/token/refresh
+    name: refresh-access-token
+    description: ""
+    method: GET
+    body: {}
+    parameters: []
+    headers:
+      - name: User-Agent
+        value: insomnia/10.0.0
+        id: pair_32c90a00c64b4b8690038a562537f2a9
+      - id: pair_6ede9459d3b440388cf646677b1c161b
+        name: Authorization
+        value: "{{ _.auth_token }}"
+        description: ""
+        disabled: false
+    authentication: {}
+    metaSortKey: -1737017948754
+    isPrivate: false
+    pathParameters: []
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: env_99d30891da4bdcebc63947a8fc17f076de878684
+    parentId: wrk_scratchpad
+    modified: 1737018901898
+    created: 1737017921480
+    name: Base Environment
+    data:
+      auth_token: "{% response 'header', 'req_19176cf6853143f085686d665b761466',
+        'b64::QXV0aG9yaXphdGlvbg==::46b', 'never', 60 %}"
+    dataPropertyOrder:
+      "&":
+        - auth_token
+    color: null
+    isPrivate: false
+    metaSortKey: 1737017921480
+    _type: environment
+  - _id: jar_99d30891da4bdcebc63947a8fc17f076de878684
+    parentId: wrk_scratchpad
+    modified: 1737037885865
+    created: 1737017921525
+    name: Default Jar
+    cookies:
+      - key: refresh_token
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJiZXRhbGluayIsImV4cCI6MTczNzEyNDI4NSwiaWF0IjoxNzM3MDM3ODg1LCJpc3MiOiJiZXRhbGluay1hdXRoIiwic2Vzc2lvbl9pZCI6ImMwYjMwYWI2LTFjODItNDc0My1hNGUxLTUzZWY3MmEwNzk0OCJ9.EHcXdvqZ2dLFMvvRADUvOVSndAG1BeVuDjZGqZpzpZg
+        maxAge: 3600
+        domain: localhost
+        path: /
+        httpOnly: true
+        hostOnly: false
+        creation: 2025-01-16T09:13:12.038Z
+        lastAccessed: 2025-01-16T14:31:25.865Z
+        id: 68b51f59-b473-45eb-a72f-689ed39205a1
+    _type: cookie_jar
