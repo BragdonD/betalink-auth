@@ -44,12 +44,12 @@ func GenerateJWT(data map[string]interface{}, secret string) (string, error) {
 }
 
 // GenerateAccessToken generates an access token with user-specific data
-func GenerateAccessToken(userID string, roles []string, secret string) (string, error) {
+func GenerateAccessToken(userID string, roles []string, secret string, validity time.Duration) (string, error) {
 	// Define claims
 	claims := map[string]interface{}{
 		"user_id": userID,
 		"roles":   roles,
-		"exp":     time.Now().Add(time.Hour).Unix(), // Token expires in 1 hour
+		"exp":     time.Now().Add(validity).Unix(), // Token expires in 1 hour
 		"iat":     time.Now().Unix(),
 		"iss":     "betalink-auth",
 		"aud":     "betalink",

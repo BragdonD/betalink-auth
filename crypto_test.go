@@ -45,7 +45,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	roles := []string{"admin", "user"}
 	secret := "mysecret"
 
-	token, err := betalinkauth.GenerateAccessToken(userID, roles, secret)
+	token, err := betalinkauth.GenerateAccessToken(userID, roles, secret, time.Hour)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, token)
 
@@ -71,7 +71,7 @@ func TestValidateAccessToken(t *testing.T) {
 	roles := []string{"admin", "user"}
 	secret := "mysecret"
 
-	token, err := betalinkauth.GenerateAccessToken(userID, roles, secret)
+	token, err := betalinkauth.GenerateAccessToken(userID, roles, secret, time.Hour)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, token)
 

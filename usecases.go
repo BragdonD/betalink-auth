@@ -141,7 +141,7 @@ func (u *Usecases) LoginUser(ctx context.Context, email, password string) (*IDTo
 	// create refresh and access tokens
 	// TODO: implement roles
 	// TODO: implement secret
-	accessToken, err := GenerateAccessToken(loginData.UserID.String(), []string{"user"}, "mysecret")
+	accessToken, err := GenerateAccessToken(loginData.UserID.String(), []string{"user"}, "mysecret", time.Hour)
 	if err != nil {
 		return nil, &ServerError{
 			Message: fmt.Errorf("could not generate access token: %w", err).Error(),
