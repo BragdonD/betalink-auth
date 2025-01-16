@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+	"time"
 
 	betalinkauth "github.com/BragdonD/betalink-auth"
 	betalinklogger "github.com/BragdonD/betalink-logger"
@@ -22,7 +23,7 @@ var (
 	dbContainer *postgres.PostgresContainer
 )
 
-const (
+var (
 	dbUser     = "auth"
 	dbPassword = "auth"
 	dbName     = "auth"
@@ -35,6 +36,7 @@ func TestMain(m *testing.M) {
 	testCtx = context.Background()
 	log.Println("Starting postgres container")
 	var err error
+
 	dbContainer, err = postgres.Run(testCtx,
 		"postgres:17-alpine",
 		postgres.WithDatabase(dbName),
@@ -133,38 +135,35 @@ func TestUsecases_RegisterUser(t *testing.T) {
 	require.NoError(t, err)
 
 	conn, err := createPgxConn()
-	if err != nil {
-		t.Fatalf("could not create pgx connection: %v", err)
-		return
-	}
+	require.NoError(t, err)
 	defer conn.Close(context.Background())
 
 	queries := betalinkauth.New(conn)
 	logger, err := createLogger()
-	if err != nil {
-		t.Fatalf("could not create logger: %v", err)
-	}
+	require.NoError(t, err)
 
 	usecases := betalinkauth.NewUsecase(logger, queries)
 
-	if err := usecases.RegisterUser(
-		context.Background(),
-		"John", "Doe",
-		"johndoe@gmail.com", "D.Ft[SHn5dLNb-wy=v'~$7"); err != nil {
-		t.Fatalf("could not register user: %v", err)
-		return
-	}
+	t.Run("valid registration", func(t *testing.T) {
+		firstName := "John"
+		lastName := "Doe"
+		email := "john.doe@example.com"
+		password := "ValidPassword123!"
 
-	log.Println("User registered")
+		err := usecases.RegisterUser(testCtx, firstName, lastName, email, password)
+		require.NoError(t, err)
+	})
 
-	// Test if the insertion was successful
-	loginData, err := queries.GetLoginDataByEmail(testCtx, "johndoe@gmail.com")
-	if err != nil {
-		t.Fatalf("could not get login data: %v", err)
-		return
-	}
+	t.Run("duplicate email", func(t *testing.T) {
+		firstName := "Jane"
+		lastName := "Smith"
+		email := "john.doe@example.com" // Duplicate email
+		password := "AnotherPassword123!"
 
-	require.NotNil(t, loginData)
+		err := usecases.RegisterUser(testCtx, firstName, lastName, email, password)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "email [john.doe@example.com] is not available")
+	})
 }
 
 func TestUsecases_LoginUser(t *testing.T) {
@@ -172,39 +171,73 @@ func TestUsecases_LoginUser(t *testing.T) {
 	require.NoError(t, err)
 
 	conn, err := createPgxConn()
-	if err != nil {
-		t.Fatalf("could not create pgx connection: %v", err)
-		return
-	}
+	require.NoError(t, err)
 	defer conn.Close(context.Background())
 
 	queries := betalinkauth.New(conn)
 	logger, err := createLogger()
-	if err != nil {
-		t.Fatalf("could not create logger: %v", err)
-	}
+	require.NoError(t, err)
 
 	usecases := betalinkauth.NewUsecase(logger, queries)
 
-	if err := usecases.RegisterUser(
-		context.Background(),
-		"John", "Doe",
-		"johndoe@gmail.com", "D.Ft[SHn5dLNb-wy=v'~$7"); err != nil {
-		t.Fatalf("could not register user: %v", err)
-		return
-	}
+	// Set up a test user
+	testEmail := "login.test@example.com"
+	testPassword := "TestPassword123!"
+	err = usecases.RegisterUser(testCtx, "Login", "Test", testEmail, testPassword)
+	require.NoError(t, err)
 
-	log.Println("User registered")
+	t.Run("valid login", func(t *testing.T) {
+		tokens, err := usecases.LoginUser(testCtx, testEmail, testPassword)
+		require.NoError(t, err)
+		require.NotNil(t, tokens)
+		require.NotEmpty(t, tokens.AccessToken)
+		require.NotEmpty(t, tokens.RefreshToken)
+	})
 
-	if _, err := usecases.LoginUser(testCtx,
-		"johndoe@gmail.com", "D.Ft[SHn5dLNb-wy=v'~$7"); err != nil {
-		t.Fatalf("could not login user: %v", err)
-		return
-	}
+	t.Run("invalid password", func(t *testing.T) {
+		_, err := usecases.LoginUser(testCtx, testEmail, "WrongPassword")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "could not compare password")
+	})
+}
 
-	if _, err := usecases.LoginUser(testCtx,
-		"johndoe@gmail.com", "testPassword"); err == nil {
-		t.Fatalf("user can login with wrong password: %v", err)
-		return
-	}
+func TestUsecases_ValidateAccessToken(t *testing.T) {
+	err := dbContainer.Restore(testCtx)
+	require.NoError(t, err)
+
+	conn, err := createPgxConn()
+	require.NoError(t, err)
+	defer conn.Close(context.Background())
+
+	queries := betalinkauth.New(conn)
+	logger, err := createLogger()
+	require.NoError(t, err)
+
+	usecases := betalinkauth.NewUsecase(logger, queries)
+
+	// Set up a test user and login to get a token
+	testEmail := "validate.token@example.com"
+	testPassword := "TokenPassword123!"
+	err = usecases.RegisterUser(testCtx, "Token", "Validate", testEmail, testPassword)
+	require.NoError(t, err)
+
+	tokens, err := usecases.LoginUser(testCtx, testEmail, testPassword)
+	require.NoError(t, err)
+	require.NotNil(t, tokens)
+
+	t.Run("valid token", func(t *testing.T) {
+		userData, err := usecases.ValidateAccessToken(testCtx, tokens.AccessToken)
+		require.NoError(t, err)
+		require.NotNil(t, userData)
+		require.Equal(t, "Token", userData.FirstName)
+	})
+
+	t.Run("expired token", func(t *testing.T) {
+		// Generate an expired token
+		expiredToken, err := betalinkauth.GenerateAccessToken("12345", []string{"user"}, "mysecret", -1*time.Hour)
+		require.NoError(t, err)
+		_, err = usecases.ValidateAccessToken(testCtx, expiredToken)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "token is expired")
+	})
 }
