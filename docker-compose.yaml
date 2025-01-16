@@ -1,6 +1,8 @@
 services:
   betalink-auth-db:
-    image: postgres:17-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.db
     environment:
       POSTGRES_USER: betalinkauth
       POSTGRES_PASSWORD: betalinkauth

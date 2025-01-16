@@ -3,6 +3,7 @@ package betalinkauth
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	betalinklogger "github.com/BragdonD/betalink-logger"
 	"github.com/gin-gonic/gin"
@@ -10,8 +11,8 @@ import (
 
 // registerUserDto is the data transfer object for registering a new user
 type registerUserDto struct {
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
+	FirstName string `json:"firstname"`
+	LastName  string `json:"lastname"`
 	Email     string `json:"email"`
 	Password  string `json:"password"`
 }
@@ -39,6 +40,8 @@ func NewRouter(logger *betalinklogger.Logger, ginRouter *gin.Engine, usecases *U
 
 	ginRouter.POST("/register", router.registerUser)
 	ginRouter.POST("/login", router.loginUser)
+	ginRouter.GET("/token/validate", router.validateAccessToken)
+	ginRouter.GET("/token/refresh", router.refreshToken)
 
 	return router
 }
@@ -49,12 +52,24 @@ func (r *Router) registerUser(ctx *gin.Context) {
 	r.logger.Info("Registering user")
 	var dto registerUserDto
 	if err := ctx.BindJSON(&dto); err != nil {
-		writeError(ctx, fmt.Errorf("could not bind json: %w", err))
+		writeResponse(
+			ctx,
+			http.StatusBadRequest,
+			false,
+			nil,
+			fmt.Errorf("could not bind json: %w", err),
+		)
 		return
 	}
 	if err := r.usecases.RegisterUser(
 		ctx, dto.FirstName, dto.LastName, dto.Email, dto.Password); err != nil {
-		writeError(ctx, err)
+		writeResponse(
+			ctx,
+			http.StatusBadRequest,
+			false,
+			nil,
+			fmt.Errorf("could not register the user: %w", err),
+		)
 		return
 	}
 
@@ -66,48 +81,147 @@ func (r *Router) loginUser(ctx *gin.Context) {
 	r.logger.Info("Logging in user")
 	var dto loginUserDto
 	if err := ctx.BindJSON(&dto); err != nil {
-		writeError(ctx, fmt.Errorf("could not bind json: %w", err))
+		writeResponse(
+			ctx,
+			http.StatusBadRequest,
+			false,
+			nil,
+			fmt.Errorf("could not bind json: %w", err),
+		)
 		return
 	}
 	tokens, err := r.usecases.LoginUser(ctx, dto.Email, dto.Password)
 	if err != nil {
-		writeError(ctx, err)
+		statusCode := getErrorStatusCode(err)
+		writeResponse(
+			ctx,
+			statusCode,
+			false,
+			nil,
+			fmt.Errorf("could not login the user: %w", err),
+		)
 		return
 	}
 
-	// Add tokens to the header
-	addToHeader(ctx.Writer.Header(), "Authorization", "Bearer "+tokens.AccessToken)
-	addToHeader(ctx.Writer.Header(), "Refresh-Token", tokens.RefreshToken)
-
-	writeResponse(ctx, http.StatusOK, gin.H{"message": "user logged in"})
-}
-
-// addToHeader adds a key-value pair to the header
-func addToHeader(header http.Header, key, value string) {
-	if header.Get(key) == "" {
-		header.Add(key, value)
+	if ctx.Writer.Header().Get("Authorization") == "" {
+		ctx.Writer.Header().Add("Authorization", "Bearer "+tokens.AccessToken)
 	}
+	ctx.SetCookie("refresh_token", tokens.RefreshToken, 3600, "/", "localhost", false, true)
+	writeResponse(ctx, http.StatusOK, true, nil, nil)
 }
 
-// writeError writes an error response to the client
-func writeError(ctx *gin.Context, err error) {
-	switch e := err.(type) {
+// validateAccessToken handles the http request to validate an access token
+func (r *Router) validateAccessToken(ctx *gin.Context) {
+	r.logger.Info("Validating access token")
+	authHeader := ctx.GetHeader("Authorization")
+	if authHeader == "" {
+		writeResponse(
+			ctx,
+			http.StatusUnauthorized,
+			false,
+			nil,
+			fmt.Errorf("authorization header is required"),
+		)
+		return
+	}
+	// Validate the format of the Authorization header
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		writeResponse(
+			ctx,
+			http.StatusUnauthorized,
+			false,
+			nil,
+			fmt.Errorf("invalid Authorization header format"),
+		)
+		return
+	}
+	accessToken := parts[1]
+
+	user, err := r.usecases.ValidateAccessToken(ctx, accessToken)
+	if err != nil {
+		if err == ExpiredTokenError {
+			// redirect to refresh token endpoint
+			ctx.Redirect(http.StatusUnauthorized, "/token/refresh")
+			return
+		}
+
+		statusCode := getErrorStatusCode(err)
+		writeResponse(
+			ctx,
+			statusCode,
+			false,
+			nil,
+			fmt.Errorf("could not validate access token: %w", err),
+		)
+		return
+	}
+
+	writeResponse(ctx, http.StatusOK, true, user, nil)
+}
+
+// refreshToken handles the http request to refresh an access token
+func (r *Router) refreshToken(ctx *gin.Context) {
+	r.logger.Info("Refreshing access token")
+	// Get the refresh token from the cookies
+	cookies := ctx.Request.Cookies()
+	var refreshToken string
+	for _, cookie := range cookies {
+		if cookie.Name == "refresh_token" {
+			refreshToken = cookie.Value
+			break
+		}
+	}
+	if refreshToken == "" {
+		writeResponse(
+			ctx,
+			http.StatusUnauthorized,
+			false,
+			nil,
+			fmt.Errorf("refresh token is required"),
+		)
+		return
+	}
+
+	tokens, err := r.usecases.RefreshAccessToken(ctx, refreshToken)
+	if err != nil {
+		statusCode := getErrorStatusCode(err)
+		writeResponse(
+			ctx,
+			statusCode,
+			false,
+			nil,
+			fmt.Errorf("could not refresh access token: %w", err),
+		)
+		return
+	}
+
+	ctx.Writer.Header().Add("Authorization", "Bearer "+tokens.AccessToken)
+	writeResponse(ctx, http.StatusOK, true, nil, nil)
+}
+
+// getErrorStatusCode returns the status code for an error
+func getErrorStatusCode(err error) int {
+	switch err.(type) {
 	case *ValidationError:
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": e.Error(),
-		})
+		return http.StatusBadRequest
 	case *ServerError:
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": e.Error(),
-		})
+		return http.StatusInternalServerError
 	default:
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
-		})
+		return http.StatusInternalServerError
 	}
 }
 
 // writeResponse writes a response to the client
-func writeResponse(ctx *gin.Context, status int, data interface{}) {
-	ctx.JSON(status, data)
+func writeResponse(ctx *gin.Context, status int, success bool, data interface{}, err error) {
+	var errStr string
+	if err != nil {
+		errStr = err.Error()
+	}
+
+	ctx.JSON(status, gin.H{
+		"success": success,
+		"data":    data,
+		"error":   errStr,
+	})
 }

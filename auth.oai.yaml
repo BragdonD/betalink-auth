@@ -464,6 +464,10 @@ paths:
       responses:
         "200":
           description: The access token is valid, and the user is authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserData"
           # TODO: add roles to the microservices to allow only certain user to access to some functionalities
           # 
           # content:
@@ -595,6 +599,19 @@ components:
           type: string
       example:
         token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTIzNDU2Nzg5MCIsIm5hbWUiOiJKb2huIERvZSJ9.Tm__Ymx-4FgWsd1zdb-WxMPojmK4Vmpx"
+    UserData:
+      type: object
+      properties:
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+      example:
+        email: "john.doe@gmail.com"
+        firstName: "John"
+        lastName: "Doe"
     UserPassword:
       type: object
       properties:

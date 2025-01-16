@@ -2,11 +2,22 @@ package betalinkauth
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"reflect"
+	"time"
 
 	betalinklogger "github.com/BragdonD/betalink-logger"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// UserData represents the user information retrieved from the auth server
+type UserData struct {
+	UserID    pgtype.UUID
+	FirstName string
+	LastName  string
+}
 
 // IDTokens is a struct containing the access and refresh tokens
 type IDTokens struct {
@@ -92,10 +103,11 @@ func checkEmailUniqueness(ctx context.Context, queries *Queries, email string) e
 	// Attempt to get login data by email
 	_, err := queries.GetLoginDataByEmail(ctx, email)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			// Email does not exist; it's unique
 			return nil
 		}
+		fmt.Println(reflect.TypeOf(err))
 		// Handle other unexpected errors
 		return &ServerError{
 			Message: fmt.Errorf("could not get login data by email: %w", err).Error(),
@@ -129,7 +141,150 @@ func (u *Usecases) LoginUser(ctx context.Context, email, password string) (*IDTo
 	// create refresh and access tokens
 	// TODO: implement roles
 	// TODO: implement secret
-	accessToken, err := GenerateAccessToken(loginData.UserID.String(), []string{"user"}, "mysecret")
+	accessToken, err := GenerateAccessToken(loginData.UserID.String(), []string{"user"}, "mysecret", time.Hour)
+	if err != nil {
+		return nil, &ServerError{
+			Message: fmt.Errorf("could not generate access token: %w", err).Error(),
+		}
+	}
+
+	createSessionParams := CreateSessionParams{
+		UserID: loginData.UserID,
+		CreatedAt: pgtype.Timestamptz{
+			Time:  time.Now(),
+			Valid: true,
+		},
+		UpdatedAt: pgtype.Timestamptz{
+			Time:  time.Now(),
+			Valid: true,
+		},
+		ExpiresAt: pgtype.Timestamptz{
+			Time:  time.Now().Add(time.Hour * 24), // TODO: make this configurable
+			Valid: true,
+		},
+	}
+	sessionID, err := u.queries.CreateSession(ctx, createSessionParams)
+	if err != nil {
+		return nil, &ServerError{
+			Message: fmt.Errorf("could not create session: %w", err).Error(),
+		}
+	}
+	refreshToken, err := GenerateRefreshToken(
+		sessionID.String(),
+		createSessionParams.CreatedAt.Time,
+		createSessionParams.ExpiresAt.Time,
+		"mysecret",
+	)
+	if err != nil {
+		return nil, &ServerError{
+			Message: fmt.Errorf("could not generate refresh token: %w", err).Error(),
+		}
+	}
+
+	return &IDTokens{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
+}
+
+// ValidateAccessToken validates an access token
+func (u *Usecases) ValidateAccessToken(ctx context.Context, accessToken string) (*UserData, error) {
+	// validate access token
+	claims, err := ValidateAccessToken(accessToken, "mysecret")
+	if err != nil {
+		return nil, &ValidationError{
+			Message: fmt.Errorf("could not validate access token: %w", err).Error(),
+		}
+	}
+
+	expiresAt, err := claims.GetExpirationTime()
+	if err != nil {
+		return nil, &ValidationError{
+			Message: fmt.Errorf("could not get expiration time: %w", err).Error(),
+		}
+	}
+
+	// check if token is expired
+	if expiresAt.Time.Before(time.Now()) {
+		return nil, ExpiredTokenError
+	}
+
+	// get user ID
+	userID, ok := claims["user_id"].(string)
+	if !ok {
+		return nil, &ValidationError{
+			Message: "could not get user ID from claims",
+		}
+	}
+	parsedUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, &ValidationError{
+			Message: "invalid UUID format",
+		}
+	}
+	pgUUID := pgtype.UUID{
+		Bytes: parsedUUID,
+		Valid: true,
+	}
+
+	user, err := u.queries.GetUserById(ctx, pgUUID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get user by ID: %w", err)
+	}
+
+	return &UserData{
+		UserID:    user.UserID,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+	}, nil
+}
+
+func (u *Usecases) RefreshAccessToken(ctx context.Context, refreshToken string) (*IDTokens, error) {
+	// validate refresh token
+	claims, err := ValidateRefreshToken(refreshToken, "mysecret")
+	if err != nil {
+		return nil, &ValidationError{
+			Message: fmt.Errorf("could not validate refresh token: %w", err).Error(),
+		}
+	}
+
+	// get session ID
+	sessionID, ok := claims["session_id"].(string)
+	if !ok {
+		return nil, &ValidationError{
+			Message: "could not get session ID from claims",
+		}
+	}
+	parsedUUID, err := uuid.Parse(sessionID)
+	if err != nil {
+		return nil, &ValidationError{
+			Message: "invalid UUID format",
+		}
+	}
+
+	// get session
+	session, err := u.queries.GetSessionById(ctx, pgtype.UUID{
+		Bytes: parsedUUID,
+		Valid: true,
+	})
+	if err != nil {
+		return nil, &ServerError{
+			Message: fmt.Errorf("could not get session by ID: %w", err).Error(),
+		}
+	}
+
+	// check if session is expired
+	if session.ExpiresAt.Time.Before(time.Now()) {
+		return nil, ExpiredTokenError
+	}
+
+	// create new access token
+	accessToken, err := GenerateAccessToken(
+		session.UserID.String(),
+		[]string{"user"},
+		"mysecret",
+		time.Hour,
+	)
 	if err != nil {
 		return nil, &ServerError{
 			Message: fmt.Errorf("could not generate access token: %w", err).Error(),
@@ -138,6 +293,6 @@ func (u *Usecases) LoginUser(ctx context.Context, email, password string) (*IDTo
 
 	return &IDTokens{
 		AccessToken:  accessToken,
-		RefreshToken: "",
+		RefreshToken: refreshToken,
 	}, nil
 }
