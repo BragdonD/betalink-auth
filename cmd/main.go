@@ -13,6 +13,8 @@ import (
 	betalinklogger "github.com/BragdonD/betalink-logger"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+	"github.com/joho/godotenv"
+	"gopkg.in/yaml.v3"
 )
 
 // TODO: implement configuration
@@ -20,7 +22,40 @@ const (
 	logPath = "./logs/betalink-auth.log"
 )
 
+// loadYamlConfig loads the configuration from a yaml file
+func loadYamlConfig(path string) (*betalinkauth.Config, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not open config file: %w", err)
+	}
+	defer file.Close()
+
+	config := &betalinkauth.Config{}
+	if err := yaml.NewDecoder(file).Decode(config); err != nil {
+		return nil, fmt.Errorf("could not decode config file: %w", err)
+	}
+
+	return config, nil
+}
+
 func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: ./main <config-path>")
+		os.Exit(1)
+	}
+	configPath := os.Args[1]
+
+	// Load the configuration
+	config, err := loadYamlConfig(configPath)
+	if err != nil {
+		panic(fmt.Errorf("could not load config: %w", err))
+	}
+	if config.EnvironmentVarFile != "" {
+		if err := godotenv.Load(config.EnvironmentVarFile); err != nil {
+			panic(fmt.Errorf("could not load environment variables: %w", err))
+		}
+	}
+
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660)
 	if err != nil {
 		panic(fmt.Errorf("could not open log file: %w", err))
@@ -29,8 +64,20 @@ func main() {
 	logger := betalinklogger.NewLogger("betalink-auth", false, true, logFile)
 	logger.Info("Starting betalink-auth service")
 
+	dbConfig, err := betalinkauth.LoadDBConfigFromEnv()
+	if err != nil {
+		logger.Error(fmt.Errorf("could not load db config: %w", err))
+		return
+	}
+
+	connStr, err := dbConfig.GetDBConnString(config.DBConnTemplate)
+	if err != nil {
+		logger.Error(fmt.Errorf("could not get db connection string: %w", err))
+		return
+	}
+
 	logger.Info("Opening database connection")
-	conn, err := pgx.Connect(context.Background(), "postgres://betalinkauth:betalinkauth@localhost:5432/betalinkauth")
+	conn, err := pgx.Connect(context.Background(), connStr)
 	if err != nil {
 		logger.Error(fmt.Errorf("could not connect to database: %w", err))
 		return

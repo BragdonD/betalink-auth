@@ -1,0 +1,10 @@
+auth:
+  access_token:
+    duration: 900
+  refresh_token:
+    duration: 86400
+env_file: ""
+http:
+  port: 8080
+  host: "localhost"
+db_conn_template: "postgres://{{.user}}:{{.password}}@{{.host}}:{{.port}}/{{.dbname}}"
