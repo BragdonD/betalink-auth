@@ -1,10 +1,8 @@
 package middleware
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -13,9 +11,16 @@ import (
 
 // UserData represents the user information retrieved from the auth server
 type UserData struct {
-	UserID    string
-	FirstName string
-	LastName  string
+	UserID    string `json:"user_id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+}
+
+// AuthResponse represents the response from the auth server
+type AuthResponse struct {
+	Data    UserData `json:"data"`
+	Success bool     `json:"success"`
+	Error   string   `json:"error"`
 }
 
 // AuthRequired is a gin middleware that checks if the user is authenticated.
@@ -53,19 +58,37 @@ func AuthRequired(authServerURL string) gin.HandlerFunc {
 		resp, err := client.Do(req)
 		if err != nil || resp.StatusCode != http.StatusOK {
 			message := "Unauthorized"
-			if resp != nil {
-				body, _ := io.ReadAll(resp.Body)
-				message = fmt.Sprintf("Auth server error: %s", bytes.TrimSpace(body))
-				resp.Body.Close()
+			if err != nil {
+				message = fmt.Sprintf("Could not connect to auth server: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"success": false,
+					"data":    "",
+					"error":   message,
+				})
+			} else {
+				var respBody map[string]interface{}
+				if decodeErr := json.NewDecoder(resp.Body).Decode(&respBody); decodeErr != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{
+						"success": false,
+						"data":    "",
+						"error":   "Failed to parse response from auth server",
+					})
+					return
+				}
+				c.JSON(http.StatusUnauthorized, respBody)
 			}
-			c.JSON(http.StatusUnauthorized, gin.H{"error": message})
 			c.Abort()
 			return
 		}
 
-		var user UserData
-		if err := json.NewDecoder(resp.Body).Decode(&user); err == nil {
-			c.Set("user", user) // Store user info in the context
+		var authResp AuthResponse
+		if err := json.NewDecoder(resp.Body).Decode(&authResp); err == nil {
+			if !authResp.Success {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": authResp.Error})
+				c.Abort()
+				return
+			}
+			c.Set("user", authResp.Data) // Store user info in the context
 		}
 		resp.Body.Close()
 
