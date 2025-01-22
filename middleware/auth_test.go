@@ -18,15 +18,26 @@ var validUser = middleware.UserData{
 	LastName:  "Doe",
 }
 
+var authResponse = middleware.AuthResponse{
+	Data:    validUser,
+	Success: true,
+	Error:   "",
+}
+
 func TestAuthRequired(t *testing.T) {
 	// Mock the authentication server
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "Bearer valid-token" {
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(validUser)
+			_ = json.NewEncoder(w).Encode(authResponse)
 		} else {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(middleware.AuthResponse{
+				Data:    middleware.UserData{},
+				Success: false,
+				Error:   "Unauthorized",
+			})
 		}
 	}))
 	defer authServer.Close()
@@ -59,7 +70,15 @@ func TestAuthRequired(t *testing.T) {
 			name:         "Unauthorized token",
 			authHeader:   "Bearer invalid-token",
 			expectedCode: http.StatusUnauthorized,
-			expectedBody: `{"error":"Auth server error: Unauthorized"}`,
+			expectedBody: `{
+				"data": {
+					"first_name": "",
+					"last_name": "",
+					"user_id": ""
+				},
+				"success": false,
+				"error": "Unauthorized"
+			}`,
 		},
 	}
 
