@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/BragdonD/betalink-auth/middleware"
 	betalinklogger "github.com/BragdonD/betalink-logger"
 	"github.com/gin-gonic/gin"
 )
@@ -157,7 +158,13 @@ func (r *Router) validateAccessToken(ctx *gin.Context) {
 		return
 	}
 
-	writeResponse(ctx, http.StatusOK, true, user, nil)
+	userdata := middleware.UserData{
+		UserID:    user.UserID.String(),
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+	}
+
+	writeResponse(ctx, http.StatusOK, true, userdata, nil)
 }
 
 // refreshToken handles the http request to refresh an access token
